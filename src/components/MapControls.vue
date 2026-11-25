@@ -77,6 +77,7 @@ defineProps<{
 }
 
 .map-controls__button {
+	touch-action: manipulation;
 	display: flex;
 	align-items: center;
 	justify-content: center;

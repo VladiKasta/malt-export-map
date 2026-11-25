@@ -14,6 +14,7 @@ const { geojson, loading, error, exportData } = useMapData()
 const { countries, countriesWithMarkers, pathGenerator } = useMapGeometry(geojson, exportData)
 
 const {
+	mapTransition,
 	svgRef,
 	isDragging,
 	mapTransform,
@@ -78,6 +79,7 @@ const { mapRef, popupRef, popupStyle, updatePopupPosition } = useCountryPopup(
 			:viewBox="`0 0 ${width} ${height}`"
 			xmlns="http://www.w3.org/2000/svg"
 			class="map-svg"
+			:style="{ '--map-transition': mapTransition }"
 			:class="{ 'map-svg--dragging': isDragging }"
 			@pointerdown="onPointerDown"
 			@pointermove="onPointerMove"
@@ -89,13 +91,14 @@ const { mapRef, popupRef, popupStyle, updatePopupPosition } = useCountryPopup(
 			<g
 				class="map-content"
 				:style="{
-					transition: isDragging ? 'none' : 'transform 650ms ease-in-out',
+					transition: isDragging ? 'none' : mapTransition,
 				}"
 				:transform="`translate(${mapTransform.x}, ${mapTransform.y}) scale(${mapTransform.scale})`"
 			>
 				<!-- Контуры стран -->
 				<path
 					v-for="country in countries"
+					v-memo="[country, selectedCountry?.id]"
 					:key="country.id"
 					:d="country.path ?? ''"
 					class="country"
@@ -118,6 +121,7 @@ const { mapRef, popupRef, popupStyle, updatePopupPosition } = useCountryPopup(
 				<!-- Маркеры -->
 				<g
 					v-for="country in countriesWithMarkers"
+					v-memo="[country, markerScale]"
 					:key="`markers-${country.id}`"
 					:transform="`translate(${country.center[0]}, ${country.center[1]})`"
 					class="country-markers"
@@ -368,24 +372,24 @@ const { mapRef, popupRef, popupStyle, updatePopupPosition } = useCountryPopup(
 
 @media (max-width: 768px) {
 	.country-popup {
-		width: min(260px, calc(100% - 16px));
-		padding: 16px;
-		border-radius: 14px;
+		width: min(220px, calc(100% - 16px));
+		padding: 12px;
+		border-radius: 10px;
 	}
 
 	.country-popup__close {
-		top: 18px;
-		right: 18px;
+		top: 14px;
+		right: 14px;
 	}
 
 	.country-popup__title {
-		font-size: 16px;
+		font-size: 14px;
 		margin-bottom: 8px;
 	}
 
 	.country-popup__subtitle {
 		font-size: 12px;
-		margin-bottom: 12px;
+		margin-bottom: 8px;
 	}
 
 	.country-popup__products li {
@@ -404,7 +408,7 @@ const { mapRef, popupRef, popupStyle, updatePopupPosition } = useCountryPopup(
 }
 
 .country-markers__scale {
-	transition: transform 650ms ease-in-out;
+	transition: var(--map-transition, none);
 }
 
 .country-outline {

@@ -20,6 +20,19 @@ export function useMapNavigation(pathGenerator: GeoPath) {
 	const dragState = ref<DragState | null>(null)
 	const isDragging = ref(false)
 	const suppressClick = ref(false)
+	let dragViewportScale = 1
+	let dragFrame: number | null = null
+	let pendingTransform: MapTransform | null = null
+
+	function finishDragFrame(apply: boolean) {
+		if (dragFrame !== null) cancelAnimationFrame(dragFrame)
+		dragFrame = null
+		if (apply && pendingTransform) mapTransform.value = pendingTransform
+		pendingTransform = null
+	}
+
+	onUnmounted(() => finishDragFrame(false))
+	const mapTransition = computed(() => isMobile.value ? 'none' : 'transform 650ms ease-in-out')
 
 	const MIN_SCALE = 1
 	const MAX_SCALE = 8
@@ -73,7 +86,11 @@ export function useMapNavigation(pathGenerator: GeoPath) {
 		}
 
 		const svg = svgRef.value
-		if (!svg) return
+		if (!svg || dragState.value) return
+
+		const rect = svg.getBoundingClientRect()
+		dragViewportScale = Math.min(rect.width / width, rect.height / height)
+		if (dragViewportScale <= 0) return
 
 		dragState.value = {
 			pointerId: event.pointerId,
@@ -93,14 +110,12 @@ export function useMapNavigation(pathGenerator: GeoPath) {
 			return
 		}
 
-		const rect = svg.getBoundingClientRect()
-
 		// Переводим пиксели экрана в координаты viewBox
-		const dx = (event.clientX - drag.startX) * (width / rect.width)
-		const dy = (event.clientY - drag.startY) * (height / rect.height)
+		const dx = (event.clientX - drag.startX) / dragViewportScale
+		const dy = (event.clientY - drag.startY) / dragViewportScale
 
 		// Небольшой порог, чтобы клик не считался перетаскиванием
-		if (!drag.moved && Math.hypot(dx, dy) < 2) {
+		if (!drag.moved && Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) < 2) {
 			return
 		}
 
@@ -112,11 +127,18 @@ export function useMapNavigation(pathGenerator: GeoPath) {
 		drag.moved = true
 		isDragging.value = true
 
-		mapTransform.value = clampMapPosition({
+		pendingTransform = clampMapPosition({
 			...mapTransform.value,
 			x: drag.initialX + dx,
 			y: drag.initialY + dy,
 		})
+		if (dragFrame === null) {
+			dragFrame = requestAnimationFrame(() => {
+				dragFrame = null
+				if (pendingTransform) mapTransform.value = pendingTransform
+				pendingTransform = null
+			})
+		}
 	}
 
 	function onPointerUp(event: PointerEvent) {
@@ -127,6 +149,7 @@ export function useMapNavigation(pathGenerator: GeoPath) {
 		}
 
 		suppressClick.value = drag.moved
+		finishDragFrame(true)
 
 		if (svgRef.value?.hasPointerCapture(event.pointerId)) {
 			svgRef.value.releasePointerCapture(event.pointerId)
@@ -141,11 +164,13 @@ export function useMapNavigation(pathGenerator: GeoPath) {
 			return
 		}
 
+		finishDragFrame(true)
 		dragState.value = null
 		isDragging.value = false
 	}
 
 	function resetMap() {
+		finishDragFrame(false)
 		dragState.value = null
 		isDragging.value = false
 		suppressClick.value = false
@@ -167,6 +192,16 @@ export function useMapNavigation(pathGenerator: GeoPath) {
 	}
 
 	function focusCountry(country: MapCountry) {
+		if (isMobile.value && country.center) {
+			const scale = Math.min(MAX_SCALE, Math.max(3.2, mapTransform.value.scale))
+			mapTransform.value = clampMapPosition({
+				scale,
+				x: width / 2 - country.center[0] * scale,
+				y: height / 2 - country.center[1] * scale,
+			})
+			return
+		}
+
 		const [[x0, y0], [x1, y1]] = pathGenerator.bounds(country.feature)
 
 		const countryWidth = x1 - x0
@@ -212,6 +247,7 @@ export function useMapNavigation(pathGenerator: GeoPath) {
 	}
 
 	return {
+		mapTransition,
 		svgRef,
 		isDragging,
 		mapTransform,
