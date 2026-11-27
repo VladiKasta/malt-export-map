@@ -29,6 +29,7 @@ const {
 	onPointerMove,
 	onPointerUp,
 	onPointerCancel,
+	onLostPointerCapture,
 	onMapClickCapture,
 } = useMapNavigation(pathGenerator)
 
@@ -85,7 +86,7 @@ const { mapRef, popupRef, popupStyle, updatePopupPosition } = useCountryPopup(
 			@pointermove="onPointerMove"
 			@pointerup="onPointerUp"
 			@pointercancel="onPointerCancel"
-			@lostpointercapture="onPointerCancel"
+			@lostpointercapture="onLostPointerCapture"
 			@click.capture="onMapClickCapture"
 		>
 			<g

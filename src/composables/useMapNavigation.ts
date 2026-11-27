@@ -164,9 +164,18 @@ export function useMapNavigation(pathGenerator: GeoPath) {
 			return
 		}
 
+		suppressClick.value = dragState.value.moved
 		finishDragFrame(true)
 		dragState.value = null
 		isDragging.value = false
+	}
+
+	function onLostPointerCapture(event: PointerEvent) {
+		const svg = svgRef.value
+		// На touch захват сначала принадлежит стране. При передаче SVG
+		// потеря захвата страной всплывает сюда, но не завершает перетаскивание.
+		if (event.target !== svg || svg?.hasPointerCapture(event.pointerId)) return
+		onPointerCancel(event)
 	}
 
 	function resetMap() {
@@ -238,7 +247,7 @@ export function useMapNavigation(pathGenerator: GeoPath) {
 	const markerScale = computed(() => (isMobile.value ? 1.2 : 1) / mapTransform.value.scale)
 
 	function onMapClickCapture(event: MouseEvent) {
-		if (!suppressClick.value) return
+		if (!suppressClick.value && !dragState.value?.moved) return
 
 		event.stopPropagation()
 		event.preventDefault()
@@ -262,6 +271,7 @@ export function useMapNavigation(pathGenerator: GeoPath) {
 		onPointerMove,
 		onPointerUp,
 		onPointerCancel,
+		onLostPointerCapture,
 		onMapClickCapture,
 	}
 }
